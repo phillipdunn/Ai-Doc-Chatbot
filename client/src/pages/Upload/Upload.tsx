@@ -24,7 +24,7 @@ const Upload: FC<Props> = () => {
     e.preventDefault();
     const formData = new FormData();
     formData.append('file', e.target.files[0]);
-    fetch('upload_file', {
+    fetch('/upload_file', {
       method: 'POST',
       body: formData,
     })
