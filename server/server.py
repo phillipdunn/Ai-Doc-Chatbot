@@ -2,9 +2,9 @@ import requests
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import os
+import constants
 
-
-# set = os.environ.get("OPENAI_API_KEY")
+os.environ["OPENAI_API_KEY"] = constants.OPENAI_API_KEY
 
 app = Flask(__name__)
 CORS(app)
@@ -30,9 +30,6 @@ def create_llamma_index():
     except Exception as e:
         return jsonify({'error': str(e)}), 400
     
-# @app.route('/')   
-# def index():
-#     return create_llamma_index() 
     
 @app.route('/upload_file', methods=['POST'])
 def upload_file():
