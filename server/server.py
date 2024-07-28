@@ -3,6 +3,9 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 import os
 
+
+# set = os.environ.get("OPENAI_API_KEY")
+
 app = Flask(__name__)
 CORS(app)
 
