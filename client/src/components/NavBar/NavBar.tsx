@@ -21,11 +21,9 @@ const NavBar = () => {
 
   const handleOpenNavMenu = (event: React.MouseEvent<HTMLElement>) => {
     setAnchorElNav(event.currentTarget);
-
   };
 
   const handleCloseNavMenu = (e: React.MouseEvent<HTMLElement>) => {
-    console.log(e.currentTarget.textContent);
     navigate(`/${e.currentTarget.textContent ? e.currentTarget.textContent.toLowerCase() : ''}`);
     setAnchorElNav(null);
   };
