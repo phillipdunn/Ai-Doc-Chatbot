@@ -2,6 +2,7 @@ import { Box, Button, Typography } from '@mui/material';
 import React, { FC } from 'react';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import { styled } from '@mui/material/styles';
+import { toast } from 'react-toastify';
 
 interface Props { }
 
@@ -20,7 +21,20 @@ const VisuallyHiddenInput = styled('input')({
 const Upload: FC<Props> = () => {
 
   const handleSubmit = (e: any) => {
-    console.log(e.target.files[0]);
+    e.preventDefault();
+    const formData = new FormData();
+    formData.append('file', e.target.files[0]);
+    fetch('upload_file', {
+      method: 'POST',
+      body: formData,
+    })
+      .then((response) => response.json())
+      .then((result) => {
+        toast.success('File uploaded successfully');
+      })
+      .catch((error) => {
+        toast.error('Error uploading file');
+      });
   };
 
   return (
