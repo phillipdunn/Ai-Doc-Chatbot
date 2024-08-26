@@ -122,7 +122,7 @@ const NavBar = () => {
 
           <Box sx={{ flexGrow: 0 }}>
             <IconButton sx={{ p: 0 }}>
-              <Avatar alt="Remy Sharp" src="/static/images/avatar/2.jpg" />
+              <Avatar alt="Remy Sharp" src='https://i.pravatar.cc/150?img=3' />
             </IconButton>
           </Box>
         </Toolbar>

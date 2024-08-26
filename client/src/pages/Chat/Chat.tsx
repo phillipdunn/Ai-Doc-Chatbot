@@ -60,7 +60,7 @@ const Chat: FC<Props> = () => {
       .then((response) => { response.json() })
 
       .then((resData: any) => {
-        console.log(resData?.result)
+        console.log(resData)
         const messages = [
           ...chatMessages,
           {
