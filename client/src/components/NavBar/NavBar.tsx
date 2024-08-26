@@ -46,6 +46,7 @@ const NavBar = () => {
               letterSpacing: '.3rem',
               color: 'inherit',
               textDecoration: 'none',
+              pointerEvents: 'none',
             }}
           >
             Doc Chatbot

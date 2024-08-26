@@ -12,7 +12,7 @@ function App() {
       <NavBar />
       <ToastContainer />
       <Routes>
-        <Route path="/" element={<Chat />} />
+        <Route path="/chat" element={<Chat />} />
         <Route path="/upload" element={<Upload />} />
       </Routes>
     </BrowserRouter>
