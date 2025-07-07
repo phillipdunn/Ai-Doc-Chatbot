@@ -1,40 +1,75 @@
+import os
+import json
 import requests
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-import os
 import constants
 
+# Set the OpenAI API key as an environment variable
 os.environ["OPENAI_API_KEY"] = constants.OPENAI_API_KEY
+
+from llama_index.core import VectorStoreIndex, download_loader, StorageContext, load_index_from_storage
+from llama_index.core.chat_engine.condense_question import CondenseQuestionChatEngine
+from llama_index.core.prompts import Prompt
+from llama_index.core.llms import ChatMessage, MessageRole
+import traceback
 
 app = Flask(__name__)
 CORS(app)
 
-def create_llamma_index():
-    try:
-        index_dir='index'
-        os.makedirs(index_dir, exist_ok=True)
-    
-        # import gpt stuff
-        from llama_index.core import VectorStoreIndex, SimpleDirectoryReader
-        # read and index documents
-        documents = SimpleDirectoryReader('uploads').load_data() 
-        # create vector store index
-        index = VectorStoreIndex(documents) 
-        # stores this index in the specified directory
-        index.storage_context.persist(persist_dir=index_dir)
-        # check if index is empty
-        if not os.path.exists(index_dir) or not os.listdir(index_dir):
-            return jsonify({'error': 'Index not created'}), 400
-    
-        return jsonify({'message': 'File indexed successfully'})
-    except Exception as e:
-        return jsonify({'error': str(e)}), 400
+UPLOAD_DIR = 'uploads'
+INDEX_DIR = 'index'
 
-# creates a custom prompt to be used in quering the index
-def get_custom_prompt():
+def create_llama_index():
     try:
-        from llama_index.prompts import Prompt
-        return Prompt("""\
+        print("Creating directories...")
+        os.makedirs(INDEX_DIR, exist_ok=True)
+        os.makedirs(UPLOAD_DIR, exist_ok=True)
+
+        documents = []
+
+        for filename in os.listdir(UPLOAD_DIR):
+            filepath = os.path.join(UPLOAD_DIR, filename)
+            print(f"Processing file: {filename}")
+
+            if filename.endswith('.docx'):
+                print("Using DocxReader...")
+                DocxReader = download_loader("DocxReader")
+                loader = DocxReader()
+                docs = loader.load_data(file=filepath)
+                print(f"Loaded {len(docs)} documents from DOCX")
+                documents.extend(docs)
+
+            elif filename.endswith('.txt'):
+                print("Using SimpleDirectoryReader...")
+                from llama_index.core import SimpleDirectoryReader
+                reader = SimpleDirectoryReader(input_files=[filepath])
+                docs = reader.load_data()
+                print(f"Loaded {len(docs)} documents from TXT")
+                documents.extend(docs)
+
+            else:
+                print(f"Unsupported file format: {filename}")
+
+        if not documents:
+            return jsonify({'error': 'No supported documents found'}), 400
+
+        print("Creating index...")
+        index = VectorStoreIndex(documents)
+        index.storage_context.persist(persist_dir=INDEX_DIR)
+
+        print("Indexing complete.")
+        return jsonify({'message': 'File indexed successfully'})
+
+    except Exception as e:
+        print("❌ Exception occurred:")
+        traceback.print_exc()
+        return jsonify({'error': f"Indexing failed: {str(e)}"}), 500
+
+
+
+def get_custom_prompt():
+    return Prompt("""\
 Rephrase the conversation and subsequent message into 
 a self-contained question while including all relevant details. 
 Conclude the question with: Only refer to this document.
@@ -47,91 +82,69 @@ Conclude the question with: Only refer to this document.
 
 <Standalone question>
 """)
-    except Exception as e:
-        # If an error occurs during the try block, catch it here
-        return jsonify({'error':  f"An error occurred: {e}"})
 
-# creates chat history
-def getChatHistory(history='[]'):
+
+def get_chat_history(history='[]'):
     try:
-        from llama_index.llms import ChatMessage, MessageRole
         history = json.loads(history)
-
-        # initialize chart history
         custom_chat_history = []
         roles = {"left_bubble": "ASSISTANT", "right_bubble": "USER"}
         for chat in history:
-            position = chat['position']
-            role = MessageRole[roles[position]]
-            content = chat['message']
-            custom_chat_history.append(
-                ChatMessage(
-                    # can be USER or ASSISTANT
-                    role=role,
-                    content=content
-                )
-            )
+            position = chat.get('position')
+            role = MessageRole[roles.get(position, "USER")]
+            content = chat.get('message', '')
+            custom_chat_history.append(ChatMessage(role=role, content=content))
         return custom_chat_history
     except Exception as e:
-        # If an error occurs during the try block, catch it here
-        return jsonify({'error':  f"An error occurred: {e}"})
-    
-        
-def query_index():
-    # retrive open ai key
-    try:
-        from llama_index.core import StorageContext, load_index_from_storage
-        from llama_index.core.chat_engine.condense_question import CondenseQuestionChatEngine
-      
-        index_dir = 'index'
+        raise ValueError(f"Invalid chat history format: {e}")
 
-        if not os.path.exists(index_dir) or not os.listdir(index_dir):
-            return jsonify({'error':  f"Index directory '{index_dir}' does not exist or is empty."})
+
+def query_index():
+    try:
+        if not os.path.exists(INDEX_DIR) or not os.listdir(INDEX_DIR):
+            return jsonify({'error': f"Index directory '{INDEX_DIR}' does not exist or is empty."}), 400
+
         data = request.get_json()
         prompt = data.get('prompt')
-        chatHistory = data.get('chatHistory')
-        
-        storage_context = StorageContext.from_defaults(persist_dir=index_dir)
+        chat_history = data.get('chatHistory', '[]')
+
+        storage_context = StorageContext.from_defaults(persist_dir=INDEX_DIR)
         index = load_index_from_storage(storage_context)
-        
-        # TODO query engine not working
+
         query_engine = index.as_query_engine()
         chat_engine = CondenseQuestionChatEngine.from_defaults(
             query_engine=query_engine,
             condense_question_prompt=get_custom_prompt(),
-            chat_history=getChatHistory(chatHistory),
+            chat_history=get_chat_history(chat_history),
             verbose=True
         )
-        
-        response_node = chat_engine.chat(prompt)  # chat here
-        print('res',response_node)
-        return jsonify({'result':  response_node.response})
-    
+
+        response_node = chat_engine.chat(prompt)
+        return jsonify({'result': response_node.response})
 
     except Exception as e:
-        return jsonify({'error':  f"An error occurred: {e}"})
-    
+        return jsonify({'error': f"An error occurred: {e}"}), 500
+
+
 @app.route('/ask_ai', methods=['POST'])
 def query_endpoint():
-    response = query_index()
-    return response      
-  
+    return query_index()
+
+
 @app.route('/upload_file', methods=['POST'])
 def upload_file():
     if 'file' not in request.files:
         return jsonify({'error': 'No file part'}), 400
-    
+
     file = request.files['file']
-    
     if file.filename == '':
         return jsonify({'error': 'No selected file'}), 400
-    
-    if file:
-        upload_dir = 'uploads'
-        os.makedirs(upload_dir, exist_ok=True)
-        
-        file.save(os.path.join(upload_dir, file.filename))
-        return create_llamma_index()
+
+    os.makedirs(UPLOAD_DIR, exist_ok=True)
+    file_path = os.path.join(UPLOAD_DIR, file.filename)
+    file.save(file_path)
+
+    return create_llama_index()
 
 
 if __name__ == '__main__':
