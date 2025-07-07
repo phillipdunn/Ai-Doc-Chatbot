@@ -57,7 +57,7 @@ const Chat: FC<Props> = () => {
         "Content-Type": "application/json", // Set the content type to JSON
       },
     })
-      .then((response) => { response.json() })
+      .then((response) => response.json())
 
       .then((resData: any) => {
         console.log(resData)
@@ -106,6 +106,11 @@ const Chat: FC<Props> = () => {
                 id="chat-input"
                 placeholder="type here..."
                 maxLength={400}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    askAI();
+                  }
+                }}
               />
               <a
                 onClick={askAI}
